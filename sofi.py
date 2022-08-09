@@ -1,6 +1,6 @@
 import requests
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ExtBot, CallbackQueryHandler
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 # this represents the token thats connected to sofi bot
 # todo: it should be kept private in env variables
@@ -27,6 +27,7 @@ GET = BASE_URL + "get/"
 
 # UTILITIES
 def convertToMessageTemplate(watchable_json):
+    print("hi")
     image = watchable_json['image']
     identifier = watchable_json['identifier']
     description = watchable_json['description']
@@ -34,38 +35,55 @@ def convertToMessageTemplate(watchable_json):
 
 
 # BOT FUNCTIONS
+
+def download(identifier):
+    request = requests.get(GET + identifier)
+    result = request.json()
+    print(result)
+    return result
+
 def search(update, context):
     chat_id = update.effective_chat.id
     query = update.message.text.lower()
+
     try:
         search_query = query.split('d-')[1]
         if search_query is not None:
             request = requests.get(SEARCH + search_query)
             watchable_list = request.json()
+           
             for watchable in watchable_list:
-                print(watchable)
-                sofi_instance.send_message(chat_id, convertToMessageTemplate(watchable))
-            #sofi_instance.send_message(chat_id, result)
-            pass
+                keyboard = [
+        [
+            InlineKeyboardButton("Option 1", callback_data="1"),
+            InlineKeyboardButton("Option 2", callback_data="2"),
+        ],
+    ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                update.message.reply_text(convertToMessageTemplate(watchable), reply_markup=reply_markup)
     except:
+        print(search_query)
         pass
 
 
+def buttonFunc(update, context):
+    chat_id = update.effective_chat.id
+    query = update.callback_query
+    query.answer()
+    download_link = download(query.data)
+    print(query.data)
+    sofi_instance.send_message(chat_id, download_link)
 
-keyboard = [
-    [
-        InlineKeyboardButton("Option 1", callback_data='1'),
-        InlineKeyboardButton("Option 2", callback_data='2'),
-    ],
-    [InlineKeyboardButton("Option 3", callback_data='3')],
-]
+
 
 
 
 # BOT HANDLERS 
 search_handler = MessageHandler(Filters.text, search)
+#button_handler = CallbackQueryHandler(buttonFunc)
 
 
 # run code
 sofi_dispatcher.add_handler(search_handler)
+#sofi_dispatcher.add_handler(button_handler)
 sofi_updater.start_polling()
