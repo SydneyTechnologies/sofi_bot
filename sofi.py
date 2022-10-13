@@ -31,7 +31,7 @@ def convertToMessageTemplate(watchable_json):
     image = watchable_json['image']
     identifier = watchable_json['identifier']
     description = watchable_json['description']
-    return identifier + "\n" + image + "\n" + description
+    return [identifier + "\n" + image + "\n", identifier]
 
 
 # BOT FUNCTIONS
@@ -51,16 +51,17 @@ def search(update, context):
         if search_query is not None:
             request = requests.get(SEARCH + search_query)
             watchable_list = request.json()
-           
-            for watchable in watchable_list:
-                keyboard = [
+            message = convertToMessageTemplate(watchable_list[0])
+            idenfier = message[1]
+            context.user_data["target"] = idenfier
+            keyboard = [
         [
-            InlineKeyboardButton("Option 1", callback_data="1"),
-            InlineKeyboardButton("Option 2", callback_data="2"),
+            InlineKeyboardButton("Download", callback_data="1"),
         ],
     ]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                update.message.reply_text(convertToMessageTemplate(watchable), reply_markup=reply_markup)
+           
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            update.message.reply_text(message[0], reply_markup=reply_markup)
     except:
         print(search_query)
         pass
@@ -69,10 +70,20 @@ def search(update, context):
 def buttonFunc(update, context):
     chat_id = update.effective_chat.id
     query = update.callback_query
+
+    # CallbackQueries need to be answered, even if no notification to the user is needed
+    # Some clients may have trouble otherwise. See https://core.telegram.org/bots/api#callbackquery
     query.answer()
-    download_link = download(query.data)
-    print(query.data)
-    sofi_instance.send_message(chat_id, download_link)
+    downloadId = context.user_data["target"]
+    downloadLink = download(downloadId)["download-link"].replace("'", "")
+    query.edit_message_text(text=f"Selected option: {downloadId}")
+    # query = update.callback_query
+    # query.answer()
+    # download_link = download(query.data)
+    # print(query.data)
+    print(downloadLink)
+    # sofi_instance.send_message(chat_id=chat_id, document=f'{downloadLink}')
+    sofi_instance.send_message(chat_id, downloadLink)
 
 
 
@@ -80,10 +91,10 @@ def buttonFunc(update, context):
 
 # BOT HANDLERS 
 search_handler = MessageHandler(Filters.text, search)
-#button_handler = CallbackQueryHandler(buttonFunc)
+button_handler = CallbackQueryHandler(buttonFunc)
 
 
 # run code
 sofi_dispatcher.add_handler(search_handler)
-#sofi_dispatcher.add_handler(button_handler)
+sofi_dispatcher.add_handler(button_handler)
 sofi_updater.start_polling()
